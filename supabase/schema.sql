@@ -41,11 +41,11 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE TABLE IF NOT EXISTS moves (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-  move_type TEXT NOT NULL CHECK (move_type IN ('play', 'challenge', 'pass', 'reveal', 'penalty')),
+  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
+  move_type TEXT NOT NULL CHECK (move_type IN ('play', 'challenge', 'pass', 'reveal', 'penalty', 'game_start', 'game_end')),
   cards_played UUID[] DEFAULT '{}',
   claimed_value TEXT,
-  result TEXT CHECK (result IN ('pass', 'fail', NULL)),
+  result TEXT CHECK (result IN ('pass', 'fail', 'win', NULL)),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -159,15 +159,20 @@ CREATE POLICY cards_update_policy ON cards
 CREATE POLICY moves_select_policy ON moves
   FOR SELECT USING (is_user_in_game(moves.game_id));
 
--- Allow users to insert moves if it's their turn
+-- Allow users to insert moves if it's their turn or if they're the game creator making a system move
 CREATE POLICY moves_insert_policy ON moves
   FOR INSERT WITH CHECK (
-    EXISTS (
+    (player_id IS NOT NULL AND EXISTS (
       SELECT 1 FROM players
-      WHERE players.user_id = auth.uid()
+      WHERE players.id = moves.player_id
+      AND players.user_id = auth.uid()
       AND players.game_id = moves.game_id
-      AND players.current_turn = true
-    )
+    )) OR
+    (player_id IS NULL AND EXISTS (
+      SELECT 1 FROM games
+      WHERE games.id = moves.game_id
+      AND games.created_by = auth.uid()
+    ))
   );
 
 -- Add indexes for performance

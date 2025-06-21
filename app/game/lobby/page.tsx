@@ -76,25 +76,17 @@ export default function GameLobbyPage() {
 
   // Check authentication
   useEffect(() => {
-    const checkUser = async () => {
+    const checkAuth = async () => {
       try {
         console.log('Checking user authentication in lobby...');
         
         // Clear any potentially corrupted session data
         clearCorruptedStorage();
         
-        const { data: { user }, error: authError } = await supabaseRef.current.auth.getUser();
+        const { data: { user }, error } = await supabaseRef.current.auth.getUser();
         
-        if (authError) {
-          console.error('Authentication error:', authError);
-          setError('Authentication failed: ' + authError.message);
-          setDetailedError(authError);
-          setLoading(false);
-          return;
-        }
-        
-        if (!user) {
-          console.log('No authenticated user found, redirecting to login');
+        if (error || !user) {
+          console.log('User not authenticated, redirecting to login');
           router.push('/auth/login');
           return;
         }
@@ -103,17 +95,17 @@ export default function GameLobbyPage() {
         setUser(user);
         fetchUserGames(user.id);
         fetchPublicGames();
-      } catch (error: any) {
-        console.error('Auth error:', error);
-        setError('Authentication check failed: ' + error.message);
-        setDetailedError(error);
-        setLoading(false);
+        
+        // Check for and clean up any empty games
+        cleanupEmptyGames();
+      } catch (err) {
+        console.error('Auth check error:', err);
       } finally {
         setLoading(false);
       }
     };
     
-    checkUser();
+    checkAuth();
     
     // Clean up subscriptions when component unmounts
     return () => {
@@ -515,6 +507,76 @@ export default function GameLobbyPage() {
     console.log('Signing out user');
     await supabaseRef.current.auth.signOut();
     router.push('/');
+  };
+
+  // Function to clean up empty games
+  const cleanupEmptyGames = async () => {
+    try {
+      // Find games with no players
+      const { data: emptyGames, error: gamesError } = await supabaseRef.current
+        .from('games')
+        .select('id, (players:players(count)))')
+        .eq('status', 'lobby')
+        .filter('players.count', 'eq', 0);
+      
+      if (gamesError) {
+        console.error('Error finding empty games:', gamesError);
+        return;
+      }
+      
+      if (!emptyGames || emptyGames.length === 0) {
+        return;
+      }
+      
+      console.log(`Found ${emptyGames.length} empty games to clean up`);
+      
+      for (const game of emptyGames) {
+        await cleanupEmptyGame(game.id);
+      }
+    } catch (error) {
+      console.error('Error in cleanupEmptyGames:', error);
+    }
+  };
+  
+  // Function to clean up a single empty game
+  const cleanupEmptyGame = async (gameId: string) => {
+    try {
+      console.log('Cleaning up empty game:', gameId);
+      
+      // Delete all cards associated with this game
+      const { error: cardsError } = await supabaseRef.current
+        .from('cards')
+        .delete()
+        .eq('game_id', gameId);
+        
+      if (cardsError) {
+        console.error('Error deleting cards:', cardsError);
+      }
+      
+      // Delete all moves associated with this game
+      const { error: movesError } = await supabaseRef.current
+        .from('moves')
+        .delete()
+        .eq('game_id', gameId);
+        
+      if (movesError) {
+        console.error('Error deleting moves:', movesError);
+      }
+      
+      // Finally delete the game itself
+      const { error: gameError } = await supabaseRef.current
+        .from('games')
+        .delete()
+        .eq('id', gameId);
+        
+      if (gameError) {
+        console.error('Error deleting game:', gameError);
+      }
+      
+      console.log('Game cleanup complete for:', gameId);
+    } catch (error) {
+      console.error('Error cleaning up empty game:', error);
+    }
   };
 
   if (loading) {
