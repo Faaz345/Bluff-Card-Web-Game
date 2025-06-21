@@ -298,7 +298,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
         } else {
           console.log('Total cards in game:', allGameCards?.length || 0);
           console.log('Cards by player:', 
-            allGameCards?.reduce((acc, card) => {
+            allGameCards?.reduce((acc: Record<string, number>, card: any) => {
               acc[card.owner_player_id] = (acc[card.owner_player_id] || 0) + 1;
               return acc;
             }, {} as Record<string, number>)
@@ -815,6 +815,18 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
     }
   };
   
+  // Add a function to force refresh game data
+  const forceRefreshGame = async () => {
+    try {
+      console.log('Force refreshing game data...');
+      await fetchGameData(params.gameId);
+      console.log('Game data refreshed');
+    } catch (error: any) {
+      console.error('Error refreshing game data:', error);
+      setError('Failed to refresh game data: ' + error.message);
+    }
+  };
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -950,6 +962,12 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
                 <p>Debug: {cards.length} cards in hand, {isYourTurn ? 'Your turn' : 'Not your turn'}</p>
                 <p>User ID: {user?.id}</p>
                 <p>Player: {players.find(p => p.user_id === user?.id)?.id || 'Not found'}</p>
+                <button 
+                  onClick={forceRefreshGame}
+                  className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                >
+                  Refresh Game Data
+                </button>
               </div>
               
               <GameLog logs={gameLog} />
