@@ -900,6 +900,11 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
                         You
                       </span>
                     )}
+                    {player.current_turn && (
+                      <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Current Turn
+                      </span>
+                    )}
                   </div>
                 </li>
               ))}
