@@ -282,6 +282,30 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
       }
       
       console.log('Player cards found:', cardsData?.length || 0, cardsData);
+      
+      // Force a check for cards in the database if none were found
+      if (!cardsData || cardsData.length === 0) {
+        console.log('No cards found for player, checking if any cards exist in the game');
+        
+        // Check if any cards exist for this game
+        const { data: allGameCards, error: allCardsError } = await supabaseRef.current
+          .from('cards')
+          .select('id, owner_player_id')
+          .eq('game_id', gameId);
+          
+        if (allCardsError) {
+          console.error('Error checking all game cards:', allCardsError);
+        } else {
+          console.log('Total cards in game:', allGameCards?.length || 0);
+          console.log('Cards by player:', 
+            allGameCards?.reduce((acc, card) => {
+              acc[card.owner_player_id] = (acc[card.owner_player_id] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>)
+          );
+        }
+      }
+      
       setCards(cardsData || []);
     } catch (error: any) {
       console.error('Error fetching player cards:', error);
@@ -626,12 +650,14 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
       
       // Calculate cards per player
       const cardsPerPlayer = Math.floor(deck.length / players.length);
+      console.log(`Dealing ${cardsPerPlayer} cards per player`);
       
       // Deal cards to players
       const cardInserts = [];
       let cardIndex = 0;
       
       for (const player of players) {
+        console.log(`Dealing cards to player: ${player.display_name} (${player.id})`);
         for (let i = 0; i < cardsPerPlayer; i++) {
           if (cardIndex < deck.length) {
             cardInserts.push({
@@ -646,6 +672,8 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
           }
         }
       }
+      
+      console.log(`Inserting ${cardInserts.length} cards`);
       
       // Insert all cards
       const { error: cardsError } = await supabaseRef.current
@@ -690,6 +718,10 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
       }
       
       console.log('Game started successfully');
+      
+      // Fetch cards for the current player after starting the game
+      await fetchPlayerCards(game.id);
+      await fetchPlayZoneCards(game.id);
     } catch (error: any) {
       console.error('Error in startGame:', error);
       setError('Failed to start game: ' + error.message);
