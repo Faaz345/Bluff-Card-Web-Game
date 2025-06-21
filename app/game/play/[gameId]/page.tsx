@@ -908,6 +908,13 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
           
           {game.status === 'active' && (
             <div className="space-y-6">
+              {/* Debug information */}
+              <div className="bg-yellow-50 border border-yellow-200 p-2 rounded text-sm mb-4">
+                <p>Debug: {cards.length} cards in hand, {isYourTurn ? 'Your turn' : 'Not your turn'}</p>
+                <p>User ID: {user?.id}</p>
+                <p>Player: {players.find(p => p.user_id === user?.id)?.id || 'Not found'}</p>
+              </div>
+              
               <GameLog logs={gameLog} />
               
               {!isYourTurn && (
@@ -925,6 +932,15 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
                 }}
                 onChallenge={challengeMove}
               />
+              
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={leaveGame}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Leave Game
+                </button>
+              </div>
             </div>
           )}
           
