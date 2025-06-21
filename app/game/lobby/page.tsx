@@ -515,9 +515,8 @@ export default function GameLobbyPage() {
       // Find games with no players
       const { data: emptyGames, error: gamesError } = await supabaseRef.current
         .from('games')
-        .select('id, (players:players(count)))')
-        .eq('status', 'lobby')
-        .filter('players.count', 'eq', 0);
+        .select('id')
+        .eq('status', 'lobby');
       
       if (gamesError) {
         console.error('Error finding empty games:', gamesError);
@@ -528,9 +527,23 @@ export default function GameLobbyPage() {
         return;
       }
       
-      console.log(`Found ${emptyGames.length} empty games to clean up`);
+      // For each game, check if it has any players
+      const gamesWithNoPlayers = [];
       
       for (const game of emptyGames) {
+        const { data: players, error: playersError } = await supabaseRef.current
+          .from('players')
+          .select('id')
+          .eq('game_id', game.id);
+          
+        if (!playersError && (!players || players.length === 0)) {
+          gamesWithNoPlayers.push(game);
+        }
+      }
+      
+      console.log(`Found ${gamesWithNoPlayers.length} empty games to clean up`);
+      
+      for (const game of gamesWithNoPlayers) {
         await cleanupEmptyGame(game.id);
       }
     } catch (error) {
