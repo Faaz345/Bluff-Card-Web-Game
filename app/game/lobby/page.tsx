@@ -512,38 +512,45 @@ export default function GameLobbyPage() {
   // Function to clean up empty games
   const cleanupEmptyGames = async () => {
     try {
-      // Find games with no players
-      const { data: emptyGames, error: gamesError } = await supabaseRef.current
+      // Find games in lobby status
+      const { data: lobbyGames, error: gamesError } = await supabaseRef.current
         .from('games')
         .select('id')
         .eq('status', 'lobby');
       
       if (gamesError) {
-        console.error('Error finding empty games:', gamesError);
+        console.error('Error finding lobby games:', gamesError);
         return;
       }
       
-      if (!emptyGames || emptyGames.length === 0) {
+      if (!lobbyGames || lobbyGames.length === 0) {
+        console.log('No lobby games found to check');
         return;
       }
       
       // For each game, check if it has any players
-      const gamesWithNoPlayers = [];
+      const emptyGames = [];
       
-      for (const game of emptyGames) {
-        const { data: players, error: playersError } = await supabaseRef.current
+      for (const game of lobbyGames) {
+        // Skip if game doesn't have an id
+        if (!game.id) {
+          console.error('Game without id found:', game);
+          continue;
+        }
+        
+        const { count, error: countError } = await supabaseRef.current
           .from('players')
-          .select('id')
+          .select('*', { count: 'exact', head: true })
           .eq('game_id', game.id);
           
-        if (!playersError && (!players || players.length === 0)) {
-          gamesWithNoPlayers.push(game);
+        if (!countError && count === 0) {
+          emptyGames.push(game);
         }
       }
       
-      console.log(`Found ${gamesWithNoPlayers.length} empty games to clean up`);
+      console.log(`Found ${emptyGames.length} empty games to clean up`);
       
-      for (const game of gamesWithNoPlayers) {
+      for (const game of emptyGames) {
         await cleanupEmptyGame(game.id);
       }
     } catch (error) {
