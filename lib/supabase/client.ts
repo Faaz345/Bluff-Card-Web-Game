@@ -1,83 +1,181 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Get the Supabase URL and anon key from environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Please check your .env file.');
-}
-
-// Create a single shared Supabase client for the entire application
-// This ensures that authentication state is shared across all components and tabs
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'supabase.auth.token', // Use a consistent storage key
-  },
-});
-
-// For server-side rendering or client-side use, always return the same instance
-export const getSupabaseClient = () => {
-  // For server-side rendering, log that we're using the server instance
-  if (typeof window === 'undefined') {
-    console.log('Creating new Supabase client instance for tab: server');
-  }
-  
-  // Always return the same instance to avoid authentication issues across tabs
-  return supabase;
-};
-
-// Define database types
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       games: {
         Row: {
-          id: string;
-          code: string;
-          status: 'lobby' | 'active' | 'complete';
-          created_by: string;
-          created_at: string;
-          updated_at: string;
-        };
-      };
+          id: string
+          code: string
+          status: 'lobby' | 'active' | 'complete'
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          status?: 'lobby' | 'active' | 'complete'
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          status?: 'lobby' | 'active' | 'complete'
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       players: {
         Row: {
-          id: string;
-          user_id: string;
-          game_id: string;
-          display_name: string;
-          seat: number;
-          current_turn: boolean;
-          eliminated: boolean;
-        };
-      };
+          id: string
+          user_id: string
+          game_id: string
+          display_name: string
+          seat: number
+          current_turn: boolean
+          eliminated: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          game_id: string
+          display_name: string
+          seat?: number
+          current_turn?: boolean
+          eliminated?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          game_id?: string
+          display_name?: string
+          seat?: number
+          current_turn?: boolean
+          eliminated?: boolean
+          created_at?: string
+        }
+      }
       cards: {
         Row: {
-          id: string;
-          game_id: string;
-          owner_player_id: string | null;
-          value: string;
-          face_up: boolean;
-          in_play_zone: boolean;
-        };
-      };
+          id: string
+          game_id: string
+          owner_player_id: string | null
+          value: string
+          face_up: boolean
+          in_play_zone: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          owner_player_id?: string | null
+          value: string
+          face_up?: boolean
+          in_play_zone?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          owner_player_id?: string | null
+          value?: string
+          face_up?: boolean
+          in_play_zone?: boolean
+          created_at?: string
+        }
+      }
       moves: {
         Row: {
-          id: string;
-          game_id: string;
-          player_id: string;
-          move_type: 'play' | 'challenge' | 'pass' | 'reveal' | 'penalty';
-          cards_played: string[];
-          claimed_value: string | null;
-          result: 'pass' | 'fail' | null;
-          created_at: string;
-        };
-      };
-    };
-  };
-}; 
+          id: string
+          game_id: string
+          player_id: string | null
+          move_type: 'play' | 'challenge' | 'pass' | 'reveal' | 'penalty' | 'game_start' | 'game_end'
+          cards_played: string[]
+          claimed_value: string | null
+          result: 'pass' | 'fail' | 'win' | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          game_id: string
+          player_id?: string | null
+          move_type: 'play' | 'challenge' | 'pass' | 'reveal' | 'penalty' | 'game_start' | 'game_end'
+          cards_played?: string[]
+          claimed_value?: string | null
+          result?: 'pass' | 'fail' | 'win' | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          game_id?: string
+          player_id?: string | null
+          move_type?: 'play' | 'challenge' | 'pass' | 'reveal' | 'penalty' | 'game_start' | 'game_end'
+          cards_played?: string[]
+          claimed_value?: string | null
+          result?: 'pass' | 'fail' | 'win' | null
+          created_at?: string
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      initialize_game_deck: {
+        Args: {
+          game_id: string
+        }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
+
+export function createSupabaseClient() {
+  if (supabaseInstance) {
+    return supabaseInstance;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+  return supabaseInstance;
+}
+
+// For backward compatibility
+export const getSupabaseClient = createSupabaseClient;
+export const supabase = createSupabaseClient(); 
